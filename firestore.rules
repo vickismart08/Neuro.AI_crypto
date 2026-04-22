@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Admin UIDs: create documents only in Firebase console (e.g. admins/{yourUid} with { "active": true }).
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && request.auth.uid == adminId;
+    }
+
+    match /users/{userId} {
+      allow list: if isAdmin();
+      allow get: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isAdmin() ||
+        (isOwner(userId) &&
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['availableBalance', 'profitBalance']));
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId}/history/{entryId} {
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /users/{userId}/notifications/{notifId} {
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
