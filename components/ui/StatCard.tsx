@@ -8,12 +8,23 @@ type Props = {
   value: string;
   sub?: string;
   subColor?: string;
+  /** Replaces default `text-white` on the value line (e.g. green/red for trends). */
+  valueClassName?: string;
   icon: LucideIcon;
   iconColor: string;
   delay?: number;
 };
 
-export default function StatCard({ label, value, sub, subColor = '#00ff88', icon: Icon, iconColor, delay = 0 }: Props) {
+export default function StatCard({
+  label,
+  value,
+  sub,
+  subColor = '#00ff88',
+  valueClassName,
+  icon: Icon,
+  iconColor,
+  delay = 0,
+}: Props) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -31,7 +42,13 @@ export default function StatCard({ label, value, sub, subColor = '#00ff88', icon
         </div>
       </div>
       <div>
-        <p className="text-white font-black text-xl sm:text-2xl leading-none mb-1 truncate">{value}</p>
+        <p
+          className={`font-black text-xl sm:text-2xl leading-none mb-1 truncate ${
+            valueClassName ?? 'text-white'
+          }`}
+        >
+          {value}
+        </p>
         {sub && (
           <p className="text-xs font-semibold" style={{ color: subColor }}>
             {sub}

@@ -74,21 +74,6 @@ export const pnlData = [
   { month: 'Dec', profit: 18.7, loss: -0.4 },
 ];
 
-export const equityCurve = [
-  { date: 'Jan 1', value: 0 },
-  { date: 'Jan 15', value: 0 },
-  { date: 'Feb 1', value: 0 },
-  { date: 'Feb 15', value: 0 },
-  { date: 'Mar 1', value: 0 },
-  { date: 'Mar 15', value: 0 },
-  { date: 'Apr 1', value: 0 },
-  { date: 'Apr 15', value: 0 },
-  { date: 'May 1', value: 0 },
-  { date: 'May 15', value: 0 },
-  { date: 'Jun 1', value: 0 },
-  { date: 'Jun 15', value: 0 },
-];
-
 export const signals: Signal[] = [
   { id: 's1', time: '14:22', pair: 'BTC/USDT', signal: 'BUY', price: 44100, target: 45800, stopLoss: 43200, confidence: 92, pnl: '+$1,240', pnlNum: 1240, status: 'open', strategy: 'Momentum AI' },
   { id: 's2', time: '13:45', pair: 'BNB/USDT', signal: 'BUY', price: 412, target: 428, stopLoss: 404, confidence: 87, pnl: '+$156', pnlNum: 156, status: 'open', strategy: 'Trend Follow' },
@@ -104,7 +89,7 @@ export const signals: Signal[] = [
 export const tradeHistory: TradeHistory[] = [];
 
 export const depositAddresses = {
-  BTC: '1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf3',
-  USDT: 'TN3W4H6rK2ce4vX9YnFQHwKx8Kj3yZ4mP',
-  USDC: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+  BTC: 'bc1qyzpucek3g92z0vfmv2vejeuet6metgxhmreexe',
+  USDT: '0xE5956fE3a75a72Bf328C6644ca0546c77C0f32dc',
+  USDC: '0xE5956fE3a75a72Bf328C6644ca0546c77C0f32dc',
 };

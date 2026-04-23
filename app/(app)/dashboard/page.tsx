@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -24,10 +25,80 @@ const DEFAULT_TELEGRAM_URL = 'https://t.me/+50SA5b-gbrBkMmNk';
 const TELEGRAM_URL =
   process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL?.trim() || DEFAULT_TELEGRAM_URL;
 
+/** Cumulative offset from `profitBalance` for the dashboard profit animation. */
+const PROFIT_OFFSETS = [10, 8, 20, 17, 29] as const;
+const PROFIT_TREND: readonly ('up' | 'down')[] = ['up', 'down', 'up', 'down', 'up'];
+const PROFIT_STEP_MS = 6000;
+
+const EQUITY_DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+
+function buildEquityCurve(profit: number, active: boolean): { date: string; value: number }[] {
+  return EQUITY_DAY_LABELS.map((date, i) => {
+    if (!active || profit <= 0) return { date, value: 0 };
+    const t = i / (EQUITY_DAY_LABELS.length - 1);
+    const factor = 1 - (1 - t) ** 1.35;
+    const wobble = 0.05 * profit * Math.sin(i * 1.1);
+    return { date, value: Math.max(0, profit * factor + wobble) };
+  });
+}
+
 export default function DashboardPage() {
   const { profile } = useUserProfileLive();
+  const [profitStep, setProfitStep] = useState(0);
+
+  const hasDetectedBalance = useMemo(() => {
+    if (!profile) return false;
+    const a = profile.availableBalance ?? 0;
+    const p = profile.profitBalance ?? 0;
+    return a > 0 || p > 0;
+  }, [profile]);
+
+  useEffect(() => {
+    if (!hasDetectedBalance) return;
+    setProfitStep(0);
+    const id = window.setInterval(() => {
+      setProfitStep((i) => (i + 1) % PROFIT_OFFSETS.length);
+    }, PROFIT_STEP_MS);
+    return () => window.clearInterval(id);
+  }, [hasDetectedBalance]);
+
   const available = formatUsd(profile?.availableBalance);
-  const profit = formatUsd(profile?.profitBalance);
+
+  const baseProfit = profile?.profitBalance ?? 0;
+  const animatedProfit = hasDetectedBalance
+    ? baseProfit + PROFIT_OFFSETS[profitStep]
+    : baseProfit;
+  const profit = formatUsd(animatedProfit);
+  const profitValueClass = hasDetectedBalance
+    ? PROFIT_TREND[profitStep] === 'up'
+      ? 'text-[#00ff88] transition-colors duration-500'
+      : 'text-red-400 transition-colors duration-500'
+    : undefined;
+
+  const chartTrend = hasDetectedBalance ? PROFIT_TREND[profitStep] : 'up';
+
+  const equityChartData = useMemo(
+    () => buildEquityCurve(animatedProfit, hasDetectedBalance),
+    [animatedProfit, hasDetectedBalance]
+  );
+
+  const profitReturnPct = useMemo(() => {
+    const avail = profile?.availableBalance ?? 0;
+    if (avail <= 0) return 0;
+    return (animatedProfit / avail) * 100;
+  }, [profile?.availableBalance, animatedProfit]);
+
+  const analysisValueClass = hasDetectedBalance
+    ? chartTrend === 'up'
+      ? 'text-[#00ff88] transition-colors duration-500'
+      : 'text-red-400 transition-colors duration-500'
+    : 'text-white/90';
+
+  const analysisPctClass = hasDetectedBalance
+    ? chartTrend === 'up'
+      ? 'text-[#00ff88]/90 transition-colors duration-500'
+      : 'text-red-400/90 transition-colors duration-500'
+    : 'text-white/45';
 
   return (
     <div className="w-full min-w-0 max-w-full space-y-6 pb-2 sm:pb-4">
@@ -44,6 +115,7 @@ export default function DashboardPage() {
           label="Profit made"
           value={profit}
           subColor="#00ff88"
+          valueClassName={profitValueClass}
           icon={TrendingUp}
           iconColor="#00ff88"
           delay={0.05}
@@ -65,7 +137,7 @@ export default function DashboardPage() {
         className="flex flex-col gap-3 sm:flex-row sm:items-stretch"
       >
         <Link
-          href="/dashboard#deposit"
+          href="/wallet#deposit"
           className="group flex flex-1 items-center justify-center gap-2.5 rounded-xl border border-[rgba(0,212,255,0.35)] bg-[rgba(0,212,255,0.08)] py-3.5 text-[15px] font-semibold text-[#00d4ff] transition hover:bg-[rgba(0,212,255,0.14)]"
         >
           <ArrowDownToLine className="h-5 w-5" strokeWidth={2} />
@@ -125,14 +197,18 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-white font-bold text-sm">Profit Analysis</h3>
-            <p className="text-white/40 text-xs mt-0.5">Equity curve — 6 months</p>
+            <p className="text-white/40 text-xs mt-0.5">Equity curve — last 7 days</p>
           </div>
           <div className="text-right">
-            <p className="text-white/90 font-bold text-sm">$0.00</p>
-            <p className="text-white/45 text-xs">0.00%</p>
+            <p className={`font-bold text-sm ${analysisValueClass}`}>{profit}</p>
+            <p className={`text-xs ${analysisPctClass}`}>
+              {hasDetectedBalance
+                ? `${profitReturnPct >= 0 ? '+' : ''}${profitReturnPct.toFixed(2)}% on available`
+                : '0.00%'}
+            </p>
           </div>
         </div>
-        <EquityChart />
+        <EquityChart data={equityChartData} trend={chartTrend} />
       </motion.div>
 
       <motion.div

@@ -35,7 +35,11 @@ service cloud.firestore {
 
     match /users/{userId}/notifications/{notifId} {
       allow get, list: if isOwner(userId) || isAdmin();
-      allow create, update, delete: if isAdmin();
+      allow create, delete: if isAdmin();
+      // Owner may only flip read — admin full update
+      allow update: if isAdmin() ||
+        (isOwner(userId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']));
     }
   }
 }

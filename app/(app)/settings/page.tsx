@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { User, Bell, Loader2, Inbox } from 'lucide-react';
+import { User, Bell, Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { isFirebaseConfigured } from '@/lib/firebase/client';
 import { useUserNotificationsLive } from '@/lib/hooks/useUserNotificationsLive';
+import AccountMessagesList from '@/components/messages/AccountMessagesList';
 import { fetchUserProfileDoc, type UserProfileDocument } from '@/lib/firebase/userProfile';
 
 type RowProps = { label: string; value: string; mono?: boolean };
@@ -119,29 +120,7 @@ export default function SettingsPage() {
         transition={{ delay: 0.08 }}
         className="glass p-6"
       >
-        <div className="mb-5 flex items-center gap-3">
-          <Inbox size={15} className="text-[#8b5cf6]" />
-          <h3 className="font-bold text-white">Messages</h3>
-        </div>
-        {messagesLoading ? (
-          <p className="text-sm text-white/45">Loading messages…</p>
-        ) : accountMessages.length === 0 ? (
-          <p className="text-sm text-white/40">No messages yet. The team can send you updates here.</p>
-        ) : (
-          <ul className="space-y-4">
-            {accountMessages.map((m) => (
-              <li key={m.id} className="border-b border-white/6 pb-4 last:border-0 last:pb-0">
-                <p className="text-sm font-semibold text-white">{m.title}</p>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-white/60">{m.message}</p>
-                <p className="mt-1.5 text-[11px] text-white/30">
-                  {m.createdAt && typeof m.createdAt.toDate === 'function'
-                    ? m.createdAt.toDate().toLocaleString()
-                    : '—'}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
+        <AccountMessagesList items={accountMessages} loading={messagesLoading} showHeader />
       </motion.div>
 
       {/* Notification preferences (local UI only) */}
