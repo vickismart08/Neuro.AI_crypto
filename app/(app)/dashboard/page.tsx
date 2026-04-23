@@ -26,12 +26,12 @@ const TELEGRAM_URL =
   process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL?.trim() || DEFAULT_TELEGRAM_URL;
 
 /**
- * Repeating deltas applied to live profit. Each 6s the next step runs; after +12
+ * Repeating deltas applied to live profit. Each 5 minutes the next step runs; after +12
  * the pattern restarts with +10 while the total keeps climbing (no reset to base+10).
  */
 const PROFIT_DELTAS = [10, -2, 12, -3, 12] as const;
 const PROFIT_TREND: readonly ('up' | 'down')[] = ['up', 'down', 'up', 'down', 'up'];
-const PROFIT_STEP_MS = 6000;
+const PROFIT_STEP_MS = 5 * 60 * 1000;
 
 const EQUITY_DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
