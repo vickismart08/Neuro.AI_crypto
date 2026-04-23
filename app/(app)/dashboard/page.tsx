@@ -25,8 +25,11 @@ const DEFAULT_TELEGRAM_URL = 'https://t.me/+50SA5b-gbrBkMmNk';
 const TELEGRAM_URL =
   process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL?.trim() || DEFAULT_TELEGRAM_URL;
 
-/** Cumulative offset from `profitBalance` for the dashboard profit animation. */
-const PROFIT_OFFSETS = [10, 8, 20, 17, 29] as const;
+/**
+ * Repeating deltas applied to live profit. Each 6s the next step runs; after +12
+ * the pattern restarts with +10 while the total keeps climbing (no reset to base+10).
+ */
+const PROFIT_DELTAS = [10, -2, 12, -3, 12] as const;
 const PROFIT_TREND: readonly ('up' | 'down')[] = ['up', 'down', 'up', 'down', 'up'];
 const PROFIT_STEP_MS = 6000;
 
@@ -44,7 +47,10 @@ function buildEquityCurve(profit: number, active: boolean): { date: string; valu
 
 export default function DashboardPage() {
   const { profile } = useUserProfileLive();
-  const [profitStep, setProfitStep] = useState(0);
+  /** Extra dollars on top of `profitBalance` from the running animation. */
+  const [profitBonus, setProfitBonus] = useState(0);
+  /** Index of the last applied delta in `PROFIT_DELTAS` (drives green/red). */
+  const [lastDeltaIdx, setLastDeltaIdx] = useState(0);
 
   const hasDetectedBalance = useMemo(() => {
     if (!profile) return false;
@@ -54,10 +60,17 @@ export default function DashboardPage() {
   }, [profile]);
 
   useEffect(() => {
-    if (!hasDetectedBalance) return;
-    setProfitStep(0);
+    if (!hasDetectedBalance) {
+      setProfitBonus(0);
+      return;
+    }
+    setProfitBonus(10);
+    setLastDeltaIdx(0);
+    let nextIdx = 1;
     const id = window.setInterval(() => {
-      setProfitStep((i) => (i + 1) % PROFIT_OFFSETS.length);
+      setProfitBonus((b) => b + PROFIT_DELTAS[nextIdx]);
+      setLastDeltaIdx(nextIdx);
+      nextIdx = (nextIdx + 1) % PROFIT_DELTAS.length;
     }, PROFIT_STEP_MS);
     return () => window.clearInterval(id);
   }, [hasDetectedBalance]);
@@ -65,17 +78,15 @@ export default function DashboardPage() {
   const available = formatUsd(profile?.availableBalance);
 
   const baseProfit = profile?.profitBalance ?? 0;
-  const animatedProfit = hasDetectedBalance
-    ? baseProfit + PROFIT_OFFSETS[profitStep]
-    : baseProfit;
+  const animatedProfit = hasDetectedBalance ? baseProfit + profitBonus : baseProfit;
   const profit = formatUsd(animatedProfit);
   const profitValueClass = hasDetectedBalance
-    ? PROFIT_TREND[profitStep] === 'up'
+    ? PROFIT_TREND[lastDeltaIdx] === 'up'
       ? 'text-[#00ff88] transition-colors duration-500'
       : 'text-red-400 transition-colors duration-500'
     : undefined;
 
-  const chartTrend = hasDetectedBalance ? PROFIT_TREND[profitStep] : 'up';
+  const chartTrend = hasDetectedBalance ? PROFIT_TREND[lastDeltaIdx] : 'up';
 
   const equityChartData = useMemo(
     () => buildEquityCurve(animatedProfit, hasDetectedBalance),
