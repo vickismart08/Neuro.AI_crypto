@@ -14,7 +14,9 @@ import {
 } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 import dynamic from 'next/dynamic';
+import { useAuth } from '@/components/providers/AuthProvider';
 import { useUserProfileLive } from '@/lib/hooks/useUserProfileLive';
+import { setProfitCycleStart } from '@/lib/firebase/userProfile';
 import { formatUsd } from '@/lib/money';
 import { depositPackages, formatPackageRange } from '@/lib/depositPackages';
 import { portfolioStats } from '@/lib/data';
@@ -32,6 +34,7 @@ const TELEGRAM_URL =
 const PROFIT_DELTAS = [10, -2, 12, -3, 12] as const;
 const PROFIT_TREND: readonly ('up' | 'down')[] = ['up', 'down', 'up', 'down', 'up'];
 const PROFIT_STEP_MS = 5 * 60 * 1000;
+const PROFIT_CYCLE_SUM = PROFIT_DELTAS.reduce((sum, d) => sum + d, 0);
 
 const EQUITY_DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
@@ -45,12 +48,25 @@ function buildEquityCurve(profit: number, active: boolean): { date: string; valu
   });
 }
 
+function getProfitBonusFromElapsed(elapsedMs: number): { bonus: number; lastDeltaIdx: number } {
+  // At cycle start we apply the first +10 immediately, then continue every interval.
+  const stepsApplied = Math.max(1, Math.floor(elapsedMs / PROFIT_STEP_MS) + 1);
+  const fullCycles = Math.floor(stepsApplied / PROFIT_DELTAS.length);
+  const remainder = stepsApplied % PROFIT_DELTAS.length;
+
+  let bonus = fullCycles * PROFIT_CYCLE_SUM;
+  for (let i = 0; i < remainder; i += 1) {
+    bonus += PROFIT_DELTAS[i];
+  }
+
+  const lastDeltaIdx = (stepsApplied - 1) % PROFIT_DELTAS.length;
+  return { bonus, lastDeltaIdx };
+}
+
 export default function DashboardPage() {
+  const { user } = useAuth();
   const { profile } = useUserProfileLive();
-  /** Extra dollars on top of `profitBalance` from the running animation. */
-  const [profitBonus, setProfitBonus] = useState(0);
-  /** Index of the last applied delta in `PROFIT_DELTAS` (drives green/red). */
-  const [lastDeltaIdx, setLastDeltaIdx] = useState(0);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const hasDetectedBalance = useMemo(() => {
     if (!profile) return false;
@@ -60,24 +76,25 @@ export default function DashboardPage() {
   }, [profile]);
 
   useEffect(() => {
-    if (!hasDetectedBalance) {
-      setProfitBonus(0);
-      return;
-    }
-    setProfitBonus(10);
-    setLastDeltaIdx(0);
-    let nextIdx = 1;
-    const id = window.setInterval(() => {
-      setProfitBonus((b) => b + PROFIT_DELTAS[nextIdx]);
-      setLastDeltaIdx(nextIdx);
-      nextIdx = (nextIdx + 1) % PROFIT_DELTAS.length;
-    }, PROFIT_STEP_MS);
+    if (!hasDetectedBalance || !user?.uid || profile?.profitCycleStartedAtMs) return;
+    void setProfitCycleStart(user.uid, Date.now()).catch(() => {
+      // Non-blocking: UI continues using live time until Firestore syncs.
+    });
+  }, [hasDetectedBalance, user?.uid, profile?.profitCycleStartedAtMs]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [hasDetectedBalance]);
+  }, []);
 
   const available = formatUsd(profile?.availableBalance);
 
   const baseProfit = profile?.profitBalance ?? 0;
+  const cycleStartMs = profile?.profitCycleStartedAtMs ?? nowMs;
+  const elapsedMs = Math.max(0, nowMs - cycleStartMs);
+  const { bonus: profitBonus, lastDeltaIdx } = hasDetectedBalance
+    ? getProfitBonusFromElapsed(elapsedMs)
+    : { bonus: 0, lastDeltaIdx: 0 };
   const animatedProfit = hasDetectedBalance ? baseProfit + profitBonus : baseProfit;
   const profit = formatUsd(animatedProfit);
   const profitValueClass = hasDetectedBalance
