@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import ClientProtection from '@/components/security/ClientProtection';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="antialiased overflow-x-hidden bg-[#050b18]">
+        <ClientProtection />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
